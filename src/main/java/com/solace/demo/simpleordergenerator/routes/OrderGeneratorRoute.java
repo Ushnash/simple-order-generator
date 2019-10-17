@@ -22,8 +22,10 @@ public class OrderGeneratorRoute extends RouteBuilder {
     public void configure() throws Exception {
 	from("timer:orderTimer?period={{ordergen.period}}").routeId("OrderGeneratorRoute")
 
-	        //generate a random order #
+	        //generate a random order # & ensure the message is DMQ (DLQ) eligible, with a TTL attached
 		.setHeader("OrderNumber").simple("${random(1,{{ordergen.ordernumber.max}})}")
+		.setHeader("JMS_Solace_DeadMsgQueueEligible").constant(true)
+		.setHeader("JMSExpiration").constant("{{ordergen.msg.ttl}}")
 		
 		//Use an idempotent repository to store the first occurrence of an order.
 		//The first occurrence of an order is sent to a work-intake queue.
@@ -32,10 +34,10 @@ public class OrderGeneratorRoute extends RouteBuilder {
 		.idempotentConsumer(header("OrderNumber"), memoryIdempotentRepository(200)).skipDuplicate(false)
 		.filter(exchangeProperty(Exchange.DUPLICATE_MESSAGE).isEqualTo(true))
                   .toD("solace-jms:topic:order/${header.OrderNumber}")
-		  .log("Order #${header.OrderNumber} routed to sub-topic")
+		  .log("Order #${header.OrderNumber} routed to sub-topic order/${header.OrderNumber}")
 		  .stop()
 		.end()
-		.to("{{ordergen.start.channel}}")
-		.log("Order #${header.OrderNumber} routed to {{ordergen.start.channel}}");
+		.toD("solace-jms:topic:order/${header.OrderNumber}/new")
+		.log("Order #${header.OrderNumber} routed to order/${header.OrderNumber}/new");
     }
 }
