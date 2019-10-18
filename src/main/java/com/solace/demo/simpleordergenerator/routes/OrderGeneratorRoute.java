@@ -26,6 +26,7 @@ public class OrderGeneratorRoute extends RouteBuilder {
 		.setHeader("OrderNumber").simple("${random(1,{{ordergen.ordernumber.max}})}")
 		.setHeader("JMS_Solace_DeadMsgQueueEligible").constant(true)
 		.setHeader("JMSExpiration").constant("{{ordergen.msg.ttl}}")
+		.setBody().simple("${header.OrderNumber}")
 		
 		//Use an idempotent repository to store the first occurrence of an order.
 		//The first occurrence of an order is sent to a work-intake queue.
